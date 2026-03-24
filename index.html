@@ -72,6 +72,9 @@
   .cat-banner p { font-size: 0.9rem; color: #7a5c00; font-weight: 500; }
   .cat-select { padding: 4px 8px; border: 1px solid #dde3f0; border-radius: 6px; font-size: 0.78rem; background: white; color: #333; cursor: pointer; }
   .cat-select.pending { border-color: #f0b429; background: #fffdf0; }
+  .desc-editable { cursor: pointer; border-bottom: 1px dashed #ccc; padding: 2px 4px; border-radius: 4px; display: inline-block; min-width: 80px; }
+  .desc-editable:hover { background: #f0f3ff; border-bottom-color: #4f6ef7; }
+  .desc-input { padding: 4px 8px; border: 1px solid #4f6ef7; border-radius: 6px; font-size: 0.88rem; width: 220px; outline: none; }
 </style>
 </head>
 <body>
@@ -438,7 +441,8 @@ function renderTable() {
       var saldoCell = (m.saldo !== null && !isNaN(m.saldo)) ? fmt(m.saldo) : '-';
       html += '<tr>';
       html += '<td style="white-space:nowrap;color:#666">' + m.fecha + '</td>';
-      html += '<td class="desc-cell"><div class="desc-main">' + desc + '</div></td>';
+      var descHtml = '<span class="desc-editable" onclick="editDesc(' + (start+i) + ', this)" title="Clic para editar">' + desc + '</span>';
+      html += '<td class="desc-cell">' + descHtml + '</td>';
       var catCell;
       if (m.categoria.key === 'otros') {
         catCell = '<select class="cat-select pending" onchange="onCategoryChange(' + (start+i) + ', this)">' + buildCatOptions('otros') + '</select>';
@@ -518,16 +522,36 @@ function applyLearnedRules(movs) {
 
 function buildCatOptions(selectedKey) {
   var allCats = CATEGORIES.concat([{ key: 'otros', label: 'Otros', color: '#f5f5f5', text: '#555' }]);
-  var html = '';
+  var html = '<option value="">-- Selecciona --</option>';
   for (var i = 0; i < allCats.length; i++) {
     var sel = allCats[i].key === selectedKey ? ' selected' : '';
     html += '<option value="' + allCats[i].key + '"' + sel + '>' + allCats[i].label + '</option>';
   }
+  html += '<option value="__nueva__">+ Nueva categoria...</option>';
   return html;
 }
 
 function onCategoryChange(idx, selectEl) {
   var key = selectEl.value;
+  if (!key) return;
+
+  if (key === '__nueva__') {
+    var nombre = prompt('Nombre de la nueva categoria:');
+    if (!nombre || !nombre.trim()) { selectEl.value = 'otros'; return; }
+    nombre = nombre.trim();
+    var newKey = 'custom_' + nombre.toLowerCase().replace(/\s+/g, '_');
+    var cat = { key: newKey, label: nombre, color: '#eef2ff', text: '#3730a3' };
+    CATEGORIES.push(cat);
+    // Add option to this select and select it
+    var opt = document.createElement('option');
+    opt.value = newKey;
+    opt.textContent = nombre;
+    selectEl.insertBefore(opt, selectEl.lastElementChild);
+    selectEl.value = newKey;
+    onCategoryChange(idx, selectEl);
+    return;
+  }
+
   var allCats = CATEGORIES.concat([{ key: 'otros', label: 'Otros', color: '#f5f5f5', text: '#555' }]);
   var cat = null;
   for (var i = 0; i < allCats.length; i++) {
@@ -586,6 +610,37 @@ function showPendingOnly() {
   currentPage = 1;
   renderTable();
   document.querySelector('.table-section').scrollIntoView({ behavior: 'smooth' });
+}
+
+function editDesc(idx, el) {
+  var mov = allMovimientos[idx];
+  if (!mov) return;
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'desc-input';
+  input.value = mov.descripcion;
+  input.onclick = function(e) { e.stopPropagation(); };
+  input.onblur = function() { saveDesc(idx, input.value, el); };
+  input.onkeydown = function(e) {
+    if (e.key === 'Enter') { input.blur(); }
+    if (e.key === 'Escape') { el.parentElement.replaceChild(el, input); }
+  };
+  el.parentElement.replaceChild(input, el);
+  input.focus();
+  input.select();
+}
+
+function saveDesc(idx, newVal, el) {
+  var mov = allMovimientos[idx];
+  if (!mov) return;
+  newVal = newVal.trim();
+  if (newVal) mov.descripcion = newVal;
+  var desc = mov.descripcion.length > 50 ? mov.descripcion.substring(0,50) + '...' : mov.descripcion;
+  el.textContent = desc;
+  if (el.parentElement) el.parentElement.replaceChild(el, el.parentElement.querySelector('input') || el);
+  // Re-render just updates the span text - already done above
+  // Also update filtered list display
+  renderTable();
 }
 
 function processFile(file) {
