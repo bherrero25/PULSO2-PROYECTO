@@ -579,18 +579,23 @@ function onCategoryChange(idx, selectEl) {
 
   if (key === '__nueva__') {
     var nombre = prompt('Nombre de la nueva categoria:');
-    if (!nombre || !nombre.trim()) { selectEl.value = 'otros'; return; }
+    if (!nombre || !nombre.trim()) { selectEl.value = allMovimientos[idx] ? allMovimientos[idx].categoria.key : 'otros'; return; }
     nombre = nombre.trim();
-    var newKey = 'custom_' + nombre.toLowerCase().replace(/\s+/g, '_');
+    var newKey = 'custom_' + nombre.toLowerCase().replace(/[^a-z0-9]/g, '_');
     var cat = { key: newKey, label: nombre, color: '#eef2ff', text: '#3730a3' };
     CATEGORIES.push(cat);
-    // Add option to this select and select it
-    var opt = document.createElement('option');
-    opt.value = newKey;
-    opt.textContent = nombre;
-    selectEl.insertBefore(opt, selectEl.lastElementChild);
-    selectEl.value = newKey;
-    onCategoryChange(idx, selectEl);
+    saveRules();
+    // Apply to this movement and all with same description
+    var ruleKey = getRuleKey(allMovimientos[idx].descripcion);
+    learnedRules[ruleKey] = cat;
+    for (var i = 0; i < allMovimientos.length; i++) {
+      if (getRuleKey(allMovimientos[i].descripcion) === ruleKey) {
+        allMovimientos[i].categoria = cat;
+      }
+    }
+    refreshCategoryFilter();
+    updateBanner();
+    renderTable();
     return;
   }
 
@@ -601,34 +606,30 @@ function onCategoryChange(idx, selectEl) {
   }
   if (!cat) return;
 
-  // Find the movement in allMovimientos by its original index
   var mov = allMovimientos[idx];
   if (!mov) return;
 
-  // Save rule
-  var ruleKey = getRuleKey(mov.descripcion);
-  learnedRules[ruleKey] = cat;
-  saveRules();
-
   // Apply to ALL movements with same description
+  var ruleKey = getRuleKey(mov.descripcion);
   var count = 0;
   for (var i = 0; i < allMovimientos.length; i++) {
     if (getRuleKey(allMovimientos[i].descripcion) === ruleKey) {
       allMovimientos[i].categoria = cat;
-      allMovimientos[i].learned = true;
       count++;
     }
   }
 
-  // Update badge color inline
-  selectEl.className = 'cat-select';
-  var badge = selectEl.parentElement.querySelector('.category-badge');
-  if (badge) { badge.style.background = cat.color; badge.style.color = cat.text; badge.textContent = cat.label; }
+  // Auto-save rule immediately
+  learnedRules[ruleKey] = cat;
+  saveRules();
 
   refreshCategoryFilter();
   updateBanner();
-  if (count > 1) showAlert('Regla aplicada a ' + count + ' movimientos con el mismo concepto', 'success');
+  renderTable();
+
+  if (count > 1) showAlert('Categoria aplicada a ' + count + ' movimientos con el mismo concepto', 'success');
 }
+
 
 function updateBanner() {
   var pending = allMovimientos.filter(function(m) { return m.categoria.key === 'otros'; }).length;
@@ -692,7 +693,6 @@ function saveDesc(idx, newVal, el) {
 }
 
 function guardarTodo() {
-  // Save all current categories as learned rules
   for (var i = 0; i < allMovimientos.length; i++) {
     var mov = allMovimientos[i];
     if (mov.categoria.key !== 'otros') {
@@ -702,7 +702,8 @@ function guardarTodo() {
   }
   saveRules();
   refreshCategoryFilter();
-  showAlert('Guardado correctamente. Las categorias se aplicaran automaticamente la proxima vez.', 'success');
+  renderTable();
+  showAlert('Guardado correctamente. Las categorias se recordaran en la proxima importacion.', 'success');
 }
 
 function exportCSV() {
