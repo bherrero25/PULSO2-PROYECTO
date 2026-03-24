@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulso 2 â Importar movimientos</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f4f6f9;
+    color: #1a1a2e;
+    min-height: 100vh;
+  }
+
+  header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: white;
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  header h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.5px; }
+  header span { font-size: 0.85rem; opacity: 0.6; margin-top: 2px; }
+
+  .logo { font-size: 1.8rem; }
+
+  main { max-width: 1100px; margin: 0 auto; padding: 32px 20px; }
+
+  /* Upload zone */
+  .upload-section {
+    background: white;
+    border-radius: 16px;
+    padding: 40px;
+    text-align: center;
+    margin-bottom: 32px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+
+  .upload-section h2 { font-size: 1.2rem; margin-bottom: 8px; color: #1a1a2e; }
+  .upload-section p { color: #666; font-size: 0.9rem; margin-bottom: 24px; }
+
+  .drop-zone {
+    border: 2px dashed #c8d0e0;
+    border-radius: 12px;
+    padding: 48px 32px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: #f8fafd;
+  }
+
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: #4f6ef7;
+    background: #f0f3ff;
+  }
+
+  .drop-zone .icon { font-size: 3rem; margin-bottom: 12px; }
+  .drop-zone p { color: #555; margin-bottom: 16px; }
+
+  .btn {
+    display: inline-block;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+  }
+
+  .btn-primary { background: #4f6ef7; color: white; }
+  .btn-primary:hover { background: #3a5ae8; }
+  .btn-secondary { background: #f0f3ff; color: #4f6ef7; }
+  .btn-secondary:hover { background: #e0e6ff; }
+
+  #fileInput { display: none; }
+
+  .bank-badges {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 16px;
+  }
+
+  .badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 500;
+  }
+
+  .badge-green { background: #e6f9f0; color: #1a8c57; }
+  .badge-gray { background: #f0f0f0; color: #888; }
+
+  /* Stats cards */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+
+  .stat-card .label { font-size: 0.8rem; color: #888; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-card .value { font-size: 1.6rem; font-weight: 700; }
+  .stat-card .sub { font-size: 0.8rem; color: #aaa; margin-top: 4px; }
+
+  .value.positive { color: #1a8c57; }
+  .value.negative { color: #e53e3e; }
+  .value.neutral { color: #1a1a2e; }
+
+  /* Filters */
+  .filters {
+    background: white;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+
+  .filters select, .filters input {
+    padding: 8px 12px;
+    border: 1px solid #dde3f0;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    color: #333;
+    background: white;
+  }
+
+  .filters label { font-size: 0.85rem; color: #666; font-weight: 500; }
+
+  .filter-group { display: flex; align-items: center; gap: 8px; }
+
+  /* Table */
+  .table-section {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    overflow: hidden;
+  }
+
+  .table-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .table-header h3 { font-size: 1rem; font-weight: 600; }
+  .table-header span { font-size: 0.85rem; color: #888; }
+
+  table { width: 100%; border-collapse: collapse; }
+
+  th {
+    background: #f8fafd;
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 0.78rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    border-bottom: 1px solid #eee;
+  }
+
+  td {
+    padding: 13px 16px;
+    font-size: 0.88rem;
+    border-bottom: 1px solid #f5f5f5;
+    vertical-align: middle;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafbff; }
+
+  .amount-positive { color: #1a8c57; font-weight: 600; }
+  .amount-negative { color: #e53e3e; font-weight: 600; }
+
+  .category-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .desc-cell { max-width: 280px; }
+  .desc-main { font-weight: 500; color: #222; }
+  .desc-sub { font-size: 0.75rem; color: #aaa; margin-top: 2px; }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #aaa;
+  }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+  .empty-state p { font-size: 0.9rem; }
+
+  /* Alert */
+  .alert {
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    margin-bottom: 16px;
+    display: none;
+  }
+  .alert-error { background: #fff0f0; color: #c0392b; border: 1px solid #fcc; }
+  .alert-success { background: #e6f9f0; color: #1a8c57; border: 1px solid #b2eacf; }
+
+  .hidden { display: none !important; }
+
+  /* Pagination */
+  .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    padding: 16px;
+    border-top: 1px solid #f0f0f0;
+  }
+
+  .pagination button {
+    padding: 6px 14px;
+    border: 1px solid #dde3f0;
+    border-radius: 6px;
+    background: white;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #555;
+  }
+
+  .pagination button:hover { background: #f0f3ff; border-color: #4f6ef7; color: #4f6ef7; }
+  .pagination button.active { background: #4f6ef7; color: white; border-color: #4f6ef7; }
+  .pagination span { font-size: 0.85rem; color: #888; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">ð</div>
+  <div>
+    <h1>Pulso 2</h1>
+    <span>Visibilidad financiera sin esfuerzo</span>
+  </div>
+</header>
+
+<main>
+
+  <div id="alertBox" class="alert"></div>
+
+  <!-- Upload section -->
+  <div class="upload-section" id="uploadSection">
+    <h2>Importa tus movimientos bancarios</h2>
+    <p>Sube el Excel que descarga tu banco. Pulso lo lee automÃ¡ticamente.</p>
+
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <div class="icon">ð</div>
+      <p>Arrastra aquÃ­ tu fichero o haz clic para seleccionarlo</p>
+      <button class="btn btn-primary" onclick="event.stopPropagation(); document.getElementById('fileInput').click()">Seleccionar fichero</button>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" />
+    </div>
+
+    <div class="bank-badges" style="margin-top: 20px;">
+      <span class="badge badge-green">â Bankinter</span>
+      <span class="badge badge-gray">BBVA (prÃ³x.)</span>
+      <span class="badge badge-gray">CaixaBank (prÃ³x.)</span>
+      <span class="badge badge-gray">Santander (prÃ³x.)</span>
+      <span class="badge badge-gray">ING (prÃ³x.)</span>
+    </div>
+  </div>
+
+  <!-- Stats (hidden until data loaded) -->
+  <div id="statsSection" class="hidden">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="label">Ingresos del perÃ­odo</div>
+        <div class="value positive" id="statIngresos">â</div>
+        <div class="sub" id="statPeriodo">â</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Gastos del perÃ­odo</div>
+        <div class="value negative" id="statGastos">â</div>
+        <div class="sub" id="statMovs">â movimientos</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Balance neto</div>
+        <div class="value neutral" id="statBalance">â</div>
+        <div class="sub" id="statSaldo">Saldo final: â</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Mayor gasto Ãºnico</div>
+        <div class="value negative" id="statMayor">â</div>
+        <div class="sub" id="statMayorDesc">â</div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+      <div class="filter-group">
+        <label>Tipo:</label>
+        <select id="filterTipo" onchange="renderTable()">
+          <option value="">Todos</option>
+          <option value="ingreso">Ingresos</option>
+          <option value="gasto">Gastos</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>CategorÃ­a:</label>
+        <select id="filterCategoria" onchange="renderTable()">
+          <option value="">Todas</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Buscar:</label>
+        <input type="text" id="filterBuscar" placeholder="Concepto..." oninput="renderTable()" />
+      </div>
+      <button class="btn btn-secondary" onclick="resetFilters()">Limpiar filtros</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">+ Importar otro fichero</button>
+    </div>
+
+    <!-- Table -->
+    <div class="table-section">
+      <div class="table-header">
+        <h3>Movimientos</h3>
+        <span id="tableCount">â</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>DescripciÃ³n</th>
+            <th>CategorÃ­a</th>
+            <th style="text-align:right">Importe</th>
+            <th style="text-align:right">Saldo</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <div class="pagination" id="pagination"></div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// âââ State âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+let allMovimientos = [];
+let filteredMovimientos = [];
+let currentPage = 1;
+const PAGE_SIZE = 25;
+
+// âââ Categories ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+const CATEGORIES = [
+  { key: 'nomina',      label: 'ð¼ NÃ³mina',         color: '#e6f9f0', text: '#1a8c57',  keywords: ['nomina','nÃ³mina','sueldo','salario','haberes'] },
+  { key: 'hipoteca',    label: 'ð  Hipoteca/Alquiler', color: '#fff3e0', text: '#e65c00', keywords: ['hipoteca','alquiler','comunidad','ibi','vivienda'] },
+  { key: 'suministros', label: 'ð¡ Suministros',    color: '#e8f4fd', text: '#1565c0',  keywords: ['endesa','iberdrola','naturgy','gas natural','agua','telefonica','movistar','orange','vodafone','claro','luz ','electrici'] },
+  { key: 'supermercado',label: 'ð Supermercado',   color: '#f3e5f5', text: '#6a1b9a',  keywords: ['mercadona','carrefour','lidl','aldi','eroski','dia ','supermercado','alcampo','consum','hipercor','el corte ingles'] },
+  { key: 'restaurantes', label: 'ð½ï¸ Restaurantes',  color: '#fce4ec', text: '#c62828',  keywords: ['restaurante','bar ','cafeteria','cafÃ©','mcdonald','burger','glovo','uber eats','just eat','deliveroo','dominos','telepizza'] },
+  { key: 'transporte',  label: 'ð Transporte',     color: '#e0f7fa', text: '#006064',  keywords: ['gasolinera','repsol','bp ','cepsa','shell','parking','renfe','metro','emt','taxi','cabify','blablacar','peaje','toll'] },
+  { key: 'salud',       label: 'ð¥ Salud',          color: '#e8f5e9', text: '#2e7d32',  keywords: ['farmacia','medico','mÃ©dico','clinica','clÃ­nica','hospital','sanitas','adeslas','mapfre salud','dentista','oftalmol'] },
+  { key: 'seguros',     label: 'ð¡ï¸ Seguros',        color: '#fff8e1', text: '#f57f17',  keywords: ['seguro','mutua','mapfre','axa','allianz','generali','zurich','linea directa','mutualidad'] },
+  { key: 'educacion',   label: 'ð EducaciÃ³n',      color: '#e8eaf6', text: '#283593',  keywords: ['universidad','upv','upm','colegio','academia','matricula','matrÃ­cula','master','mÃ¡ster','curso'] },
+  { key: 'ocio',        label: 'ð­ Ocio',           color: '#fdf3e3', text: '#b45309',  keywords: ['netflix','spotify','amazon prime','hbo','disney','cine','teatro','concierto','deporte','gimnasio','golf','padel'] },
+  { key: 'compras',     label: 'ðï¸ Compras',        color: '#fce4ec', text: '#880e4f',  keywords: ['amazon','zara','mango','primark','fnac','mediamarkt','ikea','leroy','decathlon','el corte'] },
+  { key: 'transferencia',label: 'âï¸ Transferencia', color: '#f5f5f5', text: '#555',     keywords: ['transferencia','bizum','traspaso','orden de pago'] },
+  { key: 'cajero',      label: 'ð§ Cajero/Efectivo',color: '#eceff1', text: '#37474f',  keywords: ['cajero','reintegro','efectivo','atm'] },
+  { key: 'ingresos',    label: 'ð° Otros ingresos', color: '#e6f9f0', text: '#1a8c57',  keywords: [] },
+];
+
+function categorize(descripcion, importe) {
+  const desc = descripcion.toLowerCase();
+  if (importe > 0) {
+    for (const cat of CATEGORIES) {
+      if (cat.keywords.some(k => desc.includes(k))) return cat;
+    }
+    return CATEGORIES.find(c => c.key === 'ingresos');
+  }
+  for (const cat of CATEGORIES) {
+    if (cat.key === 'ingresos') continue;
+    if (cat.keywords.some(k => desc.includes(k))) return cat;
+  }
+  return { key: 'otros', label: 'ð¦ Otros', color: '#f5f5f5', text: '#555' };
+}
+
+// âââ Parsers âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+function parseBankinter(wb) {
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+  // Find header row (contains "Fecha contable" or "Fecha")
+  let headerRow = -1;
+  for (let i = 0; i < raw.length; i++) {
+    const row = raw[i].map(c => String(c).toLowerCase());
+    if (row.some(c => c.includes('fecha contable') || c.includes('fecha valor'))) {
+      headerRow = i;
+      break;
+    }
+  }
+
+  if (headerRow === -1) return null;
+
+  const headers = raw[headerRow].map(c => String(c).toLowerCase().trim());
+  const idxFecha = headers.findIndex(h => h.includes('fecha contable') || h === 'fecha');
+  const idxDesc  = headers.findIndex(h => h.includes('descripci') || h.includes('concepto') || h.includes('movimiento'));
+  const idxImp   = headers.findIndex(h => h.includes('importe'));
+  const idxSaldo = headers.findIndex(h => h.includes('saldo'));
+
+  if (idxFecha === -1 || idxDesc === -1 || idxImp === -1) return null;
+
+  const movs = [];
+  for (let i = headerRow + 1; i < raw.length; i++) {
+    const row = raw[i];
+    if (!row[idxFecha] && !row[idxImp]) continue;
+
+    const rawImporte = row[idxImp];
+    let importe = parseFloat(String(rawImporte).replace(/\./g, '').replace(',', '.'));
+    if (isNaN(importe)) continue;
+
+    let fecha = row[idxFecha];
+    if (typeof fecha === 'number') {
+      // Excel serial date
+      fecha = XLSX.SSF.format('dd/mm/yyyy', fecha);
+    } else {
+      fecha = String(fecha).trim();
+    }
+
+    const descripcion = String(row[idxDesc] || '').trim();
+    const saldo = idxSaldo >= 0 ? parseFloat(String(row[idxSaldo] || '').replace(/\./g, '').replace(',', '.')) : null;
+    const cat = categorize(descripcion, importe);
+
+    movs.push({ fecha, descripcion, importe, saldo, categoria: cat });
+  }
+
+  return movs;
+}
+
+function parseGenerico(wb) {
+  // Generic parser: tries to auto-detect date, description, amount columns
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+  // Find first row where we have at least 3 non-empty cells and one looks like a date
+  let headerRow = -1;
+  for (let i = 0; i < Math.min(raw.length, 15); i++) {
+    const nonEmpty = raw[i].filter(c => c !== '').length;
+    if (nonEmpty >= 3) { headerRow = i; break; }
+  }
+  if (headerRow === -1) return [];
+
+  const headers = raw[headerRow].map(c => String(c).toLowerCase().trim());
+
+  // Try to find columns by common names
+  const tryFind = (...terms) => headers.findIndex(h => terms.some(t => h.includes(t)));
+
+  const idxFecha = tryFind('fecha', 'date', 'f.operaciÃ³n', 'f.valor', 'dÃ­a');
+  const idxDesc  = tryFind('descripci', 'concepto', 'movimiento', 'detalle', 'operaciÃ³n', 'comercio');
+  const idxImp   = tryFind('importe', 'cantidad', 'amount', 'cargo', 'abono', 'euros');
+  const idxSaldo = tryFind('saldo', 'balance');
+
+  if (idxFecha === -1 || idxDesc === -1 || idxImp === -1) return [];
+
+  const movs = [];
+  for (let i = headerRow + 1; i < raw.length; i++) {
+    const row = raw[i];
+    if (!row[idxFecha] && !row[idxImp]) continue;
+
+    const rawImporte = row[idxImp];
+    let importe = parseFloat(String(rawImporte).replace(/\./g, '').replace(',', '.').replace('â','-'));
+    if (isNaN(importe)) continue;
+
+    let fecha = row[idxFecha];
+    if (typeof fecha === 'number') fecha = XLSX.SSF.format('dd/mm/yyyy', fecha);
+    else fecha = String(fecha).trim();
+
+    const descripcion = String(row[idxDesc] || '').trim();
+    const saldo = idxSaldo >= 0 ? parseFloat(String(row[idxSaldo] || '').replace(/\./g, '').replace(',', '.')) : null;
+    const cat = categorize(descripcion, importe);
+
+    movs.push({ fecha, descripcion, importe, saldo, categoria: cat });
+  }
+
+  return movs;
+}
+
+function detectAndParse(wb) {
+  // Try Bankinter first
+  const bankinter = parseBankinter(wb);
+  if (bankinter && bankinter.length > 0) return { movs: bankinter, banco: 'Bankinter' };
+
+  // Fallback to generic
+  const generico = parseGenerico(wb);
+  if (generico.length > 0) return { movs: generico, banco: 'Banco desconocido' };
+
+  return null;
+}
+
+// âââ UI ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+function fmt(n) {
+  return new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + ' â¬';
+}
+
+function showAlert(msg, type = 'error') {
+  const el = document.getElementById('alertBox');
+  el.textContent = msg;
+  el.className = `alert alert-${type}`;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 5000);
+}
+
+function loadData(movs) {
+  allMovimientos = movs;
+
+  // Stats
+  const ingresos = movs.filter(m => m.importe > 0).reduce((a, m) => a + m.importe, 0);
+  const gastos   = movs.filter(m => m.importe < 0).reduce((a, m) => a + m.importe, 0);
+  const balance  = ingresos + gastos;
+
+  const mayorGasto = movs.filter(m => m.importe < 0).sort((a, b) => a.importe - b.importe)[0];
+  const saldoFinal = movs.find(m => m.saldo !== null)?.saldo ?? null;
+
+  // Period
+  const fechas = movs.map(m => m.fecha).filter(Boolean);
+  const periodo = fechas.length > 0 ? `${fechas[fechas.length-1]} â ${fechas[0]}` : 'â';
+
+  document.getElementById('statIngresos').textContent = fmt(ingresos);
+  document.getElementById('statGastos').textContent   = fmt(Math.abs(gastos));
+  document.getElementById('statBalance').textContent  = fmt(balance);
+  document.getElementById('statBalance').className    = `value ${balance >= 0 ? 'positive' : 'negative'}`;
+  document.getElementById('statPeriodo').textContent  = periodo;
+  document.getElementById('statMovs').textContent     = `${movs.length} movimientos`;
+  document.getElementById('statMayor').textContent    = mayorGasto ? fmt(Math.abs(mayorGasto.importe)) : 'â';
+  document.getElementById('statMayorDesc').textContent = mayorGasto ? mayorGasto.descripcion.substring(0,40) : 'â';
+  document.getElementById('statSaldo').textContent    = saldoFinal !== null ? `Saldo final: ${fmt(saldoFinal)}` : '';
+
+  // Populate category filter
+  const cats = [...new Set(movs.map(m => m.categoria.key))];
+  const sel = document.getElementById('filterCategoria');
+  sel.innerHTML = '<option value="">Todas</option>';
+  cats.forEach(key => {
+    const cat = movs.find(m => m.categoria.key === key).categoria;
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = cat.label;
+    sel.appendChild(opt);
+  });
+
+  document.getElementById('statsSection').classList.remove('hidden');
+  document.getElementById('uploadSection').style.marginBottom = '0';
+
+  currentPage = 1;
+  renderTable();
+}
+
+function getFiltered() {
+  const tipo = document.getElementById('filterTipo').value;
+  const cat  = document.getElementById('filterCategoria').value;
+  const buscar = document.getElementById('filterBuscar').value.toLowerCase();
+
+  return allMovimientos.filter(m => {
+    if (tipo === 'ingreso' && m.importe <= 0) return false;
+    if (tipo === 'gasto'   && m.importe >= 0) return false;
+    if (cat && m.categoria.key !== cat) return false;
+    if (buscar && !m.descripcion.toLowerCase().includes(buscar)) return false;
+    return true;
+  });
+}
+
+function renderTable() {
+  filteredMovimientos = getFiltered();
+  const total = filteredMovimientos.length;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  if (currentPage > totalPages) currentPage = 1;
+
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const page  = filteredMovimientos.slice(start, start + PAGE_SIZE);
+
+  document.getElementById('tableCount').textContent = `${total} movimientos`;
+
+  const tbody = document.getElementById('tableBody');
+  if (page.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="icon">ð</div><p>No hay movimientos con ese filtro</p></div></td></tr>`;
+  } else {
+    tbody.innerHTML = page.map(m => {
+      const cls = m.importe >= 0 ? 'amount-positive' : 'amount-negative';
+      const sign = m.importe >= 0 ? '+' : '';
+      const desc = m.descripcion.length > 50 ? m.descripcion.substring(0,50) + 'â¦' : m.descripcion;
+      const saldoCell = m.saldo !== null ? fmt(m.saldo) : 'â';
+      return `
+        <tr>
+          <td style="white-space:nowrap;color:#666">${m.fecha}</td>
+          <td class="desc-cell"><div class="desc-main">${desc}</div></td>
+          <td><span class="category-badge" style="background:${m.categoria.color};color:${m.categoria.text}">${m.categoria.label}</span></td>
+          <td style="text-align:right" class="${cls}">${sign}${fmt(m.importe)}</td>
+          <td style="text-align:right;color:#aaa;font-size:0.82rem">${saldoCell}</td>
+        </tr>`;
+    }).join('');
+  }
+
+  // Pagination
+  const pag = document.getElementById('pagination');
+  if (totalPages <= 1) { pag.innerHTML = ''; return; }
+
+  let html = `<span>${total} resultados</span>`;
+  html += `<button onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>â¹ Anterior</button>`;
+  for (let p = 1; p <= totalPages; p++) {
+    if (p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2) {
+      html += `<button class="${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`;
+    } else if (Math.abs(p - currentPage) === 3) {
+      html += `<span>â¦</span>`;
+    }
+  }
+  html += `<button onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>Siguiente âº</button>`;
+  pag.innerHTML = html;
+}
+
+function goPage(p) {
+  const totalPages = Math.ceil(filteredMovimientos.length / PAGE_SIZE);
+  if (p < 1 || p > totalPages) return;
+  currentPage = p;
+  renderTable();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetFilters() {
+  document.getElementById('filterTipo').value = '';
+  document.getElementById('filterCategoria').value = '';
+  document.getElementById('filterBuscar').value = '';
+  currentPage = 1;
+  renderTable();
+}
+
+// âââ File handling ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+function processFile(file) {
+  if (!file) return;
+
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['xlsx','xls','csv'].includes(ext)) {
+    showAlert('Formato no compatible. Usa Excel (.xlsx, .xls) o CSV.');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array', cellDates: false });
+      const result = detectAndParse(wb);
+
+      if (!result || result.movs.length === 0) {
+        showAlert('No se pudieron leer movimientos. Comprueba que el fichero tenga el formato correcto.');
+        return;
+      }
+
+      showAlert(`â ${result.movs.length} movimientos importados correctamente de ${result.banco}`, 'success');
+      loadData(result.movs);
+    } catch(err) {
+      showAlert('Error al leer el fichero: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+document.getElementById('fileInput').addEventListener('change', (e) => {
+  processFile(e.target.files[0]);
+});
+
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  processFile(e.dataTransfer.files[0]);
+});
+</script>
+</body>
+</html>
