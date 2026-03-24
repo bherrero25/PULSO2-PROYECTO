@@ -1,5 +1,637 @@
 
 <!DOCTYPE html>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulso 2 - Importar movimientos</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f4f6f9; color: #1a1a2e; min-height: 100vh; }
+  header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 20px 32px; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.5px; }
+  header span { font-size: 0.85rem; opacity: 0.6; margin-top: 2px; }
+  .logo { width: 36px; height: 36px; background: #4f6ef7; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1rem; color: white; }
+  main { max-width: 1100px; margin: 0 auto; padding: 32px 20px; }
+  .upload-section { background: white; border-radius: 16px; padding: 40px; text-align: center; margin-bottom: 32px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+  .upload-section h2 { font-size: 1.2rem; margin-bottom: 8px; color: #1a1a2e; }
+  .upload-section p { color: #666; font-size: 0.9rem; margin-bottom: 24px; }
+  .drop-zone { border: 2px dashed #c8d0e0; border-radius: 12px; padding: 48px 32px; cursor: pointer; transition: all 0.2s; background: #f8fafd; }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: #4f6ef7; background: #f0f3ff; }
+  .drop-zone .icon { font-size: 2.5rem; margin-bottom: 12px; color: #4f6ef7; }
+  .drop-zone p { color: #555; margin-bottom: 16px; }
+  .btn { display: inline-block; padding: 10px 24px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
+  .btn-primary { background: #4f6ef7; color: white; }
+  .btn-primary:hover { background: #3a5ae8; }
+  .btn-secondary { background: #f0f3ff; color: #4f6ef7; }
+  .btn-secondary:hover { background: #e0e6ff; }
+  #fileInput { display: none; }
+  .bank-badges { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
+  .badge { padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 500; }
+  .badge-green { background: #e6f9f0; color: #1a8c57; }
+  .badge-gray { background: #f0f0f0; color: #888; }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+  .stat-card { background: white; border-radius: 12px; padding: 20px 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+  .stat-card .label { font-size: 0.8rem; color: #888; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-card .value { font-size: 1.6rem; font-weight: 700; }
+  .stat-card .sub { font-size: 0.8rem; color: #aaa; margin-top: 4px; }
+  .value.positive { color: #1a8c57; }
+  .value.negative { color: #e53e3e; }
+  .value.neutral { color: #1a1a2e; }
+  .filters { background: white; border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+  .filters select, .filters input { padding: 8px 12px; border: 1px solid #dde3f0; border-radius: 8px; font-size: 0.88rem; color: #333; background: white; }
+  .filters label { font-size: 0.85rem; color: #666; font-weight: 500; }
+  .filter-group { display: flex; align-items: center; gap: 8px; }
+  .table-section { background: white; border-radius: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); overflow: hidden; }
+  .table-header { padding: 20px 24px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
+  .table-header h3 { font-size: 1rem; font-weight: 600; }
+  .table-header span { font-size: 0.85rem; color: #888; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: #f8fafd; padding: 12px 16px; text-align: left; font-size: 0.78rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; border-bottom: 1px solid #eee; }
+  td { padding: 13px 16px; font-size: 0.88rem; border-bottom: 1px solid #f5f5f5; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafbff; }
+  .amount-positive { color: #1a8c57; font-weight: 600; }
+  .amount-negative { color: #e53e3e; font-weight: 600; }
+  .category-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 500; }
+  .desc-cell { max-width: 280px; }
+  .desc-main { font-weight: 500; color: #222; }
+  .empty-state { text-align: center; padding: 60px 20px; color: #aaa; }
+  .empty-state p { font-size: 0.9rem; }
+  .alert { padding: 12px 16px; border-radius: 8px; font-size: 0.88rem; margin-bottom: 16px; display: none; }
+  .alert-error { background: #fff0f0; color: #c0392b; border: 1px solid #fcc; }
+  .alert-success { background: #e6f9f0; color: #1a8c57; border: 1px solid #b2eacf; }
+  .hidden { display: none !important; }
+  .pagination { display: flex; justify-content: center; align-items: center; gap: 8px; padding: 16px; border-top: 1px solid #f0f0f0; flex-wrap: wrap; }
+  .pagination button { padding: 6px 14px; border: 1px solid #dde3f0; border-radius: 6px; background: white; cursor: pointer; font-size: 0.85rem; color: #555; }
+  .pagination button:hover { background: #f0f3ff; border-color: #4f6ef7; color: #4f6ef7; }
+  .pagination button.active { background: #4f6ef7; color: white; border-color: #4f6ef7; }
+  .pagination span { font-size: 0.85rem; color: #888; }
+  .cat-banner { background: #fff8e1; border: 1px solid #ffe082; border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; display: none; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  .cat-banner p { font-size: 0.9rem; color: #7a5c00; font-weight: 500; }
+  .cat-select { padding: 4px 8px; border: 1px solid #dde3f0; border-radius: 6px; font-size: 0.78rem; background: white; color: #333; cursor: pointer; }
+  .cat-select.pending { border-color: #f0b429; background: #fffdf0; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">P</div>
+  <div>
+    <h1>Pulso 2</h1>
+    <span>Visibilidad financiera sin esfuerzo</span>
+  </div>
+</header>
+
+<main>
+  <div id="alertBox" class="alert"></div>
+  <div class="cat-banner" id="catBanner">
+    <p id="catBannerText">Tienes movimientos sin categorizar</p>
+    <button class="btn btn-primary" onclick="showPendingOnly()">Categorizar ahora</button>
+    <button class="btn btn-secondary" onclick="hideBanner()">Mas tarde</button>
+  </div>
+
+  <div class="upload-section" id="uploadSection">
+    <h2>Importa tus movimientos bancarios</h2>
+    <p>Sube el Excel que descarga tu banco. Pulso lo lee automaticamente.</p>
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <div class="icon">&#128193;</div>
+      <p>Arrastra aqui tu fichero o haz clic para seleccionarlo</p>
+      <button class="btn btn-primary" onclick="event.stopPropagation(); document.getElementById('fileInput').click()">Seleccionar fichero</button>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" />
+    </div>
+    <div class="bank-badges" style="margin-top:20px">
+      <span class="badge badge-green">Bankinter</span>
+      <span class="badge badge-gray">BBVA (prox.)</span>
+      <span class="badge badge-gray">CaixaBank (prox.)</span>
+      <span class="badge badge-gray">Santander (prox.)</span>
+      <span class="badge badge-gray">ING (prox.)</span>
+    </div>
+  </div>
+
+  <div id="statsSection" class="hidden">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="label">Ingresos del periodo</div>
+        <div class="value positive" id="statIngresos">-</div>
+        <div class="sub" id="statPeriodo">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Gastos del periodo</div>
+        <div class="value negative" id="statGastos">-</div>
+        <div class="sub" id="statMovs">- movimientos</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Balance neto</div>
+        <div class="value neutral" id="statBalance">-</div>
+        <div class="sub" id="statSaldo">Saldo final: -</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Mayor gasto unico</div>
+        <div class="value negative" id="statMayor">-</div>
+        <div class="sub" id="statMayorDesc">-</div>
+      </div>
+    </div>
+
+    <div class="filters">
+      <div class="filter-group">
+        <label>Tipo:</label>
+        <select id="filterTipo" onchange="renderTable()">
+          <option value="">Todos</option>
+          <option value="ingreso">Ingresos</option>
+          <option value="gasto">Gastos</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Categoria:</label>
+        <select id="filterCategoria" onchange="renderTable()">
+          <option value="">Todas</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Buscar:</label>
+        <input type="text" id="filterBuscar" placeholder="Concepto..." oninput="renderTable()" />
+      </div>
+      <button class="btn btn-secondary" onclick="resetFilters()">Limpiar filtros</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">+ Importar otro fichero</button>
+    </div>
+
+    <div class="table-section">
+      <div class="table-header">
+        <h3>Movimientos</h3>
+        <span id="tableCount">-</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Descripcion</th>
+            <th>Categoria</th>
+            <th style="text-align:right">Importe</th>
+            <th style="text-align:right">Saldo</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <div class="pagination" id="pagination"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+var allMovimientos = [];
+var filteredMovimientos = [];
+var currentPage = 1;
+var PAGE_SIZE = 25;
+
+var CATEGORIES = [
+  { key: 'nomina',       label: 'Nomina',          color: '#e6f9f0', text: '#1a8c57',  keywords: ['nomina','nomina','sueldo','salario','haberes'] },
+  { key: 'hipoteca',     label: 'Hipoteca/Alquiler',color: '#fff3e0', text: '#e65c00', keywords: ['hipoteca','alquiler','comunidad','ibi','vivienda'] },
+  { key: 'suministros',  label: 'Suministros',      color: '#e8f4fd', text: '#1565c0', keywords: ['endesa','iberdrola','naturgy','gas natural','agua','telefonica','movistar','orange','vodafone','luz '] },
+  { key: 'supermercado', label: 'Supermercado',     color: '#f3e5f5', text: '#6a1b9a', keywords: ['mercadona','carrefour','lidl','aldi','eroski','dia ','supermercado','alcampo','consum','hipercor'] },
+  { key: 'restaurantes', label: 'Restaurantes',     color: '#fce4ec', text: '#c62828', keywords: ['restaurante','bar ','cafeteria','cafe','mcdonald','burger','glovo','uber eats','just eat','deliveroo','telepizza'] },
+  { key: 'transporte',   label: 'Transporte',       color: '#e0f7fa', text: '#006064', keywords: ['gasolinera','repsol','bp ','cepsa','shell','parking','renfe','metro','emt','taxi','cabify','peaje'] },
+  { key: 'salud',        label: 'Salud',            color: '#e8f5e9', text: '#2e7d32', keywords: ['farmacia','medico','clinica','hospital','sanitas','adeslas','mapfre salud','dentista'] },
+  { key: 'seguros',      label: 'Seguros',          color: '#fff8e1', text: '#f57f17', keywords: ['seguro','mutua','mapfre','axa','allianz','generali','zurich','linea directa'] },
+  { key: 'educacion',    label: 'Educacion',        color: '#e8eaf6', text: '#283593', keywords: ['universidad','upv','upm','colegio','academia','matricula','master','curso'] },
+  { key: 'ocio',         label: 'Ocio',             color: '#fdf3e3', text: '#b45309', keywords: ['netflix','spotify','amazon prime','hbo','disney','cine','teatro','gimnasio','golf','padel'] },
+  { key: 'compras',      label: 'Compras',          color: '#fce4ec', text: '#880e4f', keywords: ['amazon','zara','mango','primark','fnac','mediamarkt','ikea','leroy','decathlon'] },
+  { key: 'transferencia',label: 'Transferencia',    color: '#f5f5f5', text: '#555',    keywords: ['transferencia','bizum','traspaso','orden de pago'] },
+  { key: 'cajero',       label: 'Cajero/Efectivo',  color: '#eceff1', text: '#37474f', keywords: ['cajero','reintegro','efectivo','atm'] },
+  { key: 'ingresos',     label: 'Otros ingresos',   color: '#e6f9f0', text: '#1a8c57', keywords: [] }
+];
+
+function parseSpanishNumber(val) {
+  if (val === null || val === undefined || val === '') return NaN;
+  // If already a number (Excel numeric cell), return directly
+  if (typeof val === 'number') return val;
+  var s = String(val).trim();
+  // Detect Spanish format: 1.234,56 -> remove dots, replace comma with dot
+  // vs English format: 1,234.56 -> remove commas
+  if (s.indexOf(',') > s.indexOf('.') && s.indexOf(',') >= 0) {
+    // Spanish: comma is decimal separator
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else if (s.indexOf('.') > s.indexOf(',') && s.indexOf(',') >= 0) {
+    // English: dot is decimal separator
+    s = s.replace(/,/g, '');
+  } else if (s.indexOf(',') >= 0 && s.indexOf('.') < 0) {
+    // Only comma present - treat as decimal separator (Spanish)
+    s = s.replace(',', '.');
+  }
+  return parseFloat(s);
+}
+
+function categorize(descripcion, importe) {
+  var desc = descripcion.toLowerCase();
+  if (importe > 0) {
+    for (var i = 0; i < CATEGORIES.length; i++) {
+      var cat = CATEGORIES[i];
+      for (var j = 0; j < cat.keywords.length; j++) {
+        if (desc.indexOf(cat.keywords[j]) >= 0) return cat;
+      }
+    }
+    return CATEGORIES[CATEGORIES.length - 1];
+  }
+  for (var i = 0; i < CATEGORIES.length; i++) {
+    var cat = CATEGORIES[i];
+    if (cat.key === 'ingresos') continue;
+    for (var j = 0; j < cat.keywords.length; j++) {
+      if (desc.indexOf(cat.keywords[j]) >= 0) return cat;
+    }
+  }
+  return { key: 'otros', label: 'Otros', color: '#f5f5f5', text: '#555' };
+}
+
+function parseBankinter(wb) {
+  var ws = wb.Sheets[wb.SheetNames[0]];
+  var raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  var headerRow = -1;
+  for (var i = 0; i < raw.length; i++) {
+    var row = raw[i].map(function(c) { return String(c).toLowerCase(); });
+    for (var j = 0; j < row.length; j++) {
+      if (row[j].indexOf('fecha contable') >= 0 || row[j].indexOf('fecha valor') >= 0) {
+        headerRow = i; break;
+      }
+    }
+    if (headerRow >= 0) break;
+  }
+  if (headerRow === -1) return null;
+
+  var headers = raw[headerRow].map(function(c) { return String(c).toLowerCase().trim(); });
+  var idxFecha = -1, idxDesc = -1, idxImp = -1, idxSaldo = -1;
+  for (var i = 0; i < headers.length; i++) {
+    if (headers[i].indexOf('fecha contable') >= 0 || headers[i] === 'fecha') idxFecha = i;
+    if (headers[i].indexOf('descripci') >= 0 || headers[i].indexOf('concepto') >= 0) idxDesc = i;
+    if (headers[i].indexOf('importe') >= 0) idxImp = i;
+    if (headers[i].indexOf('saldo') >= 0) idxSaldo = i;
+  }
+  if (idxFecha === -1 || idxDesc === -1 || idxImp === -1) return null;
+
+  var movs = [];
+  for (var i = headerRow + 1; i < raw.length; i++) {
+    var row = raw[i];
+    if (!row[idxFecha] && !row[idxImp]) continue;
+    var rawImporte = row[idxImp];
+    var importe = parseSpanishNumber(rawImporte);
+    if (isNaN(importe)) continue;
+    var fecha = row[idxFecha];
+    if (typeof fecha === 'number') fecha = XLSX.SSF.format('dd/mm/yyyy', fecha);
+    else fecha = String(fecha).trim();
+    var descripcion = String(row[idxDesc] || '').trim();
+    var saldo = idxSaldo >= 0 ? parseSpanishNumber(row[idxSaldo]) : null;
+    var cat = categorize(descripcion, importe);
+    movs.push({ fecha: fecha, descripcion: descripcion, importe: importe, saldo: saldo, categoria: cat });
+  }
+  return movs;
+}
+
+function parseGenerico(wb) {
+  var ws = wb.Sheets[wb.SheetNames[0]];
+  var raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  var headerRow = -1;
+  for (var i = 0; i < Math.min(raw.length, 15); i++) {
+    var nonEmpty = raw[i].filter(function(c) { return c !== ''; }).length;
+    if (nonEmpty >= 3) { headerRow = i; break; }
+  }
+  if (headerRow === -1) return [];
+
+  var headers = raw[headerRow].map(function(c) { return String(c).toLowerCase().trim(); });
+  var idxFecha = -1, idxDesc = -1, idxImp = -1, idxSaldo = -1;
+  var fechaTerms = ['fecha','date','f.valor','dia'];
+  var descTerms = ['descripci','concepto','movimiento','detalle','operacion','comercio'];
+  var impTerms = ['importe','cantidad','amount','cargo','abono','euros'];
+
+  for (var i = 0; i < headers.length; i++) {
+    for (var j = 0; j < fechaTerms.length; j++) { if (headers[i].indexOf(fechaTerms[j]) >= 0 && idxFecha === -1) idxFecha = i; }
+    for (var j = 0; j < descTerms.length; j++) { if (headers[i].indexOf(descTerms[j]) >= 0 && idxDesc === -1) idxDesc = i; }
+    for (var j = 0; j < impTerms.length; j++) { if (headers[i].indexOf(impTerms[j]) >= 0 && idxImp === -1) idxImp = i; }
+    if (headers[i].indexOf('saldo') >= 0) idxSaldo = i;
+  }
+  if (idxFecha === -1 || idxDesc === -1 || idxImp === -1) return [];
+
+  var movs = [];
+  for (var i = headerRow + 1; i < raw.length; i++) {
+    var row = raw[i];
+    if (!row[idxFecha] && !row[idxImp]) continue;
+    var importe = parseSpanishNumber(row[idxImp]);
+    if (isNaN(importe)) continue;
+    var fecha = row[idxFecha];
+    if (typeof fecha === 'number') fecha = XLSX.SSF.format('dd/mm/yyyy', fecha);
+    else fecha = String(fecha).trim();
+    var descripcion = String(row[idxDesc] || '').trim();
+    var saldo = idxSaldo >= 0 ? parseSpanishNumber(row[idxSaldo]) : null;
+    var cat = categorize(descripcion, importe);
+    movs.push({ fecha: fecha, descripcion: descripcion, importe: importe, saldo: saldo, categoria: cat });
+  }
+  return movs;
+}
+
+function detectAndParse(wb) {
+  var bankinter = parseBankinter(wb);
+  if (bankinter && bankinter.length > 0) return { movs: bankinter, banco: 'Bankinter' };
+  var generico = parseGenerico(wb);
+  if (generico.length > 0) return { movs: generico, banco: 'Banco detectado' };
+  return null;
+}
+
+function fmt(n) {
+  return new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n) + ' EUR';
+}
+
+function showAlert(msg, type) {
+  type = type || 'error';
+  var el = document.getElementById('alertBox');
+  el.textContent = msg;
+  el.className = 'alert alert-' + type;
+  el.style.display = 'block';
+  setTimeout(function() { el.style.display = 'none'; }, 5000);
+}
+
+function loadData(movs) {
+  allMovimientos = movs;
+  var ingresos = 0, gastos = 0;
+  for (var i = 0; i < movs.length; i++) {
+    if (movs[i].importe > 0) ingresos += movs[i].importe;
+    else gastos += movs[i].importe;
+  }
+  var balance = ingresos + gastos;
+  var mayorGasto = null;
+  var gastoMovs = movs.filter(function(m) { return m.importe < 0; });
+  gastoMovs.sort(function(a,b) { return a.importe - b.importe; });
+  if (gastoMovs.length > 0) mayorGasto = gastoMovs[0];
+
+  var saldoFinal = null;
+  for (var i = 0; i < movs.length; i++) {
+    if (movs[i].saldo !== null && !isNaN(movs[i].saldo)) { saldoFinal = movs[i].saldo; break; }
+  }
+
+  var fechas = movs.map(function(m) { return m.fecha; }).filter(Boolean);
+  var periodo = fechas.length > 0 ? (fechas[fechas.length-1] + ' - ' + fechas[0]) : '-';
+
+  document.getElementById('statIngresos').textContent = fmt(ingresos);
+  document.getElementById('statGastos').textContent = fmt(Math.abs(gastos));
+  document.getElementById('statBalance').textContent = fmt(balance);
+  document.getElementById('statBalance').className = 'value ' + (balance >= 0 ? 'positive' : 'negative');
+  document.getElementById('statPeriodo').textContent = periodo;
+  document.getElementById('statMovs').textContent = movs.length + ' movimientos';
+  document.getElementById('statMayor').textContent = mayorGasto ? fmt(Math.abs(mayorGasto.importe)) : '-';
+  document.getElementById('statMayorDesc').textContent = mayorGasto ? mayorGasto.descripcion.substring(0,40) : '-';
+  document.getElementById('statSaldo').textContent = saldoFinal !== null ? ('Saldo final: ' + fmt(saldoFinal)) : '';
+
+  var cats = [];
+  var catKeys = {};
+  for (var i = 0; i < movs.length; i++) {
+    if (!catKeys[movs[i].categoria.key]) {
+      catKeys[movs[i].categoria.key] = true;
+      cats.push(movs[i].categoria);
+    }
+  }
+  var sel = document.getElementById('filterCategoria');
+  sel.innerHTML = '<option value="">Todas</option>';
+  for (var i = 0; i < cats.length; i++) {
+    var opt = document.createElement('option');
+    opt.value = cats[i].key;
+    opt.textContent = cats[i].label;
+    sel.appendChild(opt);
+  }
+
+  document.getElementById('statsSection').classList.remove('hidden');
+  currentPage = 1;
+  renderTable();
+  updateBanner();
+}
+
+function getFiltered() {
+  var tipo = document.getElementById('filterTipo').value;
+  var cat = document.getElementById('filterCategoria').value;
+  var buscar = document.getElementById('filterBuscar').value.toLowerCase();
+  return allMovimientos.filter(function(m) {
+    if (tipo === 'ingreso' && m.importe <= 0) return false;
+    if (tipo === 'gasto' && m.importe >= 0) return false;
+    if (cat && m.categoria.key !== cat) return false;
+    if (buscar && m.descripcion.toLowerCase().indexOf(buscar) < 0) return false;
+    return true;
+  });
+}
+
+function renderTable() {
+  filteredMovimientos = getFiltered();
+  var total = filteredMovimientos.length;
+  var totalPages = Math.ceil(total / PAGE_SIZE) || 1;
+  if (currentPage > totalPages) currentPage = 1;
+  var start = (currentPage - 1) * PAGE_SIZE;
+  var page = filteredMovimientos.slice(start, start + PAGE_SIZE);
+
+  document.getElementById('tableCount').textContent = total + ' movimientos';
+
+  var tbody = document.getElementById('tableBody');
+  if (page.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><p>No hay movimientos con ese filtro</p></div></td></tr>';
+  } else {
+    var html = '';
+    for (var i = 0; i < page.length; i++) {
+      var m = page[i];
+      var cls = m.importe >= 0 ? 'amount-positive' : 'amount-negative';
+      var sign = m.importe >= 0 ? '+' : '';
+      var desc = m.descripcion.length > 50 ? m.descripcion.substring(0,50) + '...' : m.descripcion;
+      var saldoCell = (m.saldo !== null && !isNaN(m.saldo)) ? fmt(m.saldo) : '-';
+      html += '<tr>';
+      html += '<td style="white-space:nowrap;color:#666">' + m.fecha + '</td>';
+      html += '<td class="desc-cell"><div class="desc-main">' + desc + '</div></td>';
+      var catCell;
+      if (m.categoria.key === 'otros') {
+        catCell = '<select class="cat-select pending" onchange="onCategoryChange(' + (start+i) + ', this)">' + buildCatOptions('otros') + '</select>';
+      } else {
+        catCell = '<span class="category-badge" style="background:' + m.categoria.color + ';color:' + m.categoria.text + '">' + m.categoria.label + '</span>';
+      }
+      html += '<td>' + catCell + '</td>';
+      html += '<td style="text-align:right" class="' + cls + '">' + sign + fmt(m.importe) + '</td>';
+      html += '<td style="text-align:right;color:#aaa;font-size:0.82rem">' + saldoCell + '</td>';
+      html += '</tr>';
+    }
+    tbody.innerHTML = html;
+  }
+
+  var pag = document.getElementById('pagination');
+  if (totalPages <= 1) { pag.innerHTML = ''; return; }
+  var html = '<span>' + total + ' resultados</span>';
+  html += '<button onclick="goPage(' + (currentPage-1) + ')"' + (currentPage===1?' disabled':'') + '>Anterior</button>';
+  for (var p = 1; p <= totalPages; p++) {
+    if (p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2) {
+      html += '<button class="' + (p===currentPage?'active':'') + '" onclick="goPage(' + p + ')">' + p + '</button>';
+    } else if (Math.abs(p - currentPage) === 3) {
+      html += '<span>...</span>';
+    }
+  }
+  html += '<button onclick="goPage(' + (currentPage+1) + ')"' + (currentPage===totalPages?' disabled':'') + '>Siguiente</button>';
+  pag.innerHTML = html;
+}
+
+function goPage(p) {
+  var totalPages = Math.ceil(filteredMovimientos.length / PAGE_SIZE) || 1;
+  if (p < 1 || p > totalPages) return;
+  currentPage = p;
+  renderTable();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetFilters() {
+  document.getElementById('filterTipo').value = '';
+  document.getElementById('filterCategoria').value = '';
+  document.getElementById('filterBuscar').value = '';
+  currentPage = 1;
+  renderTable();
+}
+
+// --- Learning system ---
+var learnedRules = {};
+
+function loadRules() {
+  try {
+    var stored = localStorage.getItem('pulso2_rules');
+    if (stored) learnedRules = JSON.parse(stored);
+  } catch(e) { learnedRules = {}; }
+}
+
+function saveRules() {
+  try { localStorage.setItem('pulso2_rules', JSON.stringify(learnedRules)); } catch(e) {}
+}
+
+function getRuleKey(descripcion) {
+  // Use first 40 chars of description as key (normalized)
+  return descripcion.toLowerCase().trim().substring(0, 40);
+}
+
+function applyLearnedRules(movs) {
+  loadRules();
+  for (var i = 0; i < movs.length; i++) {
+    var key = getRuleKey(movs[i].descripcion);
+    if (learnedRules[key]) {
+      var learned = learnedRules[key];
+      movs[i].categoria = { key: learned.key, label: learned.label, color: learned.color, text: learned.text };
+      movs[i].learned = true;
+    }
+  }
+  return movs;
+}
+
+function buildCatOptions(selectedKey) {
+  var allCats = CATEGORIES.concat([{ key: 'otros', label: 'Otros', color: '#f5f5f5', text: '#555' }]);
+  var html = '';
+  for (var i = 0; i < allCats.length; i++) {
+    var sel = allCats[i].key === selectedKey ? ' selected' : '';
+    html += '<option value="' + allCats[i].key + '"' + sel + '>' + allCats[i].label + '</option>';
+  }
+  return html;
+}
+
+function onCategoryChange(idx, selectEl) {
+  var key = selectEl.value;
+  var allCats = CATEGORIES.concat([{ key: 'otros', label: 'Otros', color: '#f5f5f5', text: '#555' }]);
+  var cat = null;
+  for (var i = 0; i < allCats.length; i++) {
+    if (allCats[i].key === key) { cat = allCats[i]; break; }
+  }
+  if (!cat) return;
+
+  // Find the movement in allMovimientos by its original index
+  var mov = allMovimientos[idx];
+  if (!mov) return;
+
+  // Save rule
+  var ruleKey = getRuleKey(mov.descripcion);
+  learnedRules[ruleKey] = cat;
+  saveRules();
+
+  // Apply to ALL movements with same description
+  var count = 0;
+  for (var i = 0; i < allMovimientos.length; i++) {
+    if (getRuleKey(allMovimientos[i].descripcion) === ruleKey) {
+      allMovimientos[i].categoria = cat;
+      allMovimientos[i].learned = true;
+      count++;
+    }
+  }
+
+  // Update badge color inline
+  selectEl.className = 'cat-select';
+  var badge = selectEl.parentElement.querySelector('.category-badge');
+  if (badge) { badge.style.background = cat.color; badge.style.color = cat.text; badge.textContent = cat.label; }
+
+  updateBanner();
+  if (count > 1) showAlert('Regla aplicada a ' + count + ' movimientos con el mismo concepto', 'success');
+}
+
+function updateBanner() {
+  var pending = allMovimientos.filter(function(m) { return m.categoria.key === 'otros'; }).length;
+  var banner = document.getElementById('catBanner');
+  if (pending > 0) {
+    document.getElementById('catBannerText').textContent = 'Tienes ' + pending + ' movimientos sin categorizar. Clasificalos para tener datos mas precisos.';
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+    showAlert('Todos los movimientos estan categorizados', 'success');
+  }
+}
+
+function hideBanner() {
+  document.getElementById('catBanner').style.display = 'none';
+}
+
+function showPendingOnly() {
+  document.getElementById('filterTipo').value = '';
+  document.getElementById('filterCategoria').value = 'otros';
+  document.getElementById('filterBuscar').value = '';
+  currentPage = 1;
+  renderTable();
+  document.querySelector('.table-section').scrollIntoView({ behavior: 'smooth' });
+}
+
+function processFile(file) {
+  if (!file) return;
+  var ext = file.name.split('.').pop().toLowerCase();
+  if (['xlsx','xls','csv'].indexOf(ext) < 0) {
+    showAlert('Formato no compatible. Usa Excel (.xlsx, .xls) o CSV.');
+    return;
+  }
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = new Uint8Array(e.target.result);
+      var wb = XLSX.read(data, { type: 'array', cellDates: false });
+      var result = detectAndParse(wb);
+      if (!result || result.movs.length === 0) {
+        showAlert('No se pudieron leer movimientos. Comprueba que el fichero tenga el formato correcto.');
+        return;
+      }
+      var movs = applyLearnedRules(result.movs);
+      showAlert(result.movs.length + ' movimientos importados correctamente de ' + result.banco, 'success');
+      loadData(movs);
+    } catch(err) {
+      showAlert('Error al leer el fichero: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  processFile(e.target.files[0]);
+});
+
+var dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', function() { dropZone.classList.remove('drag-over'); });
+dropZone.addEventListener('drop', function(e) {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  processFile(e.dataTransfer.files[0]);
+});
+</script>
+</body>
+</html>
+
 <html lang="es">
 <head>
 <meta charset="UTF-8">
