@@ -193,6 +193,26 @@ var CATEGORIES = [
   { key: 'ingresos',     label: 'Otros ingresos',   color: '#e6f9f0', text: '#1a8c57', keywords: [] }
 ];
 
+function parseSpanishNumber(val) {
+  if (val === null || val === undefined || val === '') return NaN;
+  // If already a number (Excel numeric cell), return directly
+  if (typeof val === 'number') return val;
+  var s = String(val).trim();
+  // Detect Spanish format: 1.234,56 -> remove dots, replace comma with dot
+  // vs English format: 1,234.56 -> remove commas
+  if (s.indexOf(',') > s.indexOf('.') && s.indexOf(',') >= 0) {
+    // Spanish: comma is decimal separator
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else if (s.indexOf('.') > s.indexOf(',') && s.indexOf(',') >= 0) {
+    // English: dot is decimal separator
+    s = s.replace(/,/g, '');
+  } else if (s.indexOf(',') >= 0 && s.indexOf('.') < 0) {
+    // Only comma present - treat as decimal separator (Spanish)
+    s = s.replace(',', '.');
+  }
+  return parseFloat(s);
+}
+
 function categorize(descripcion, importe) {
   var desc = descripcion.toLowerCase();
   if (importe > 0) {
@@ -244,13 +264,13 @@ function parseBankinter(wb) {
     var row = raw[i];
     if (!row[idxFecha] && !row[idxImp]) continue;
     var rawImporte = row[idxImp];
-    var importe = parseFloat(String(rawImporte).replace(/\./g, '').replace(',', '.'));
+    var importe = parseSpanishNumber(rawImporte);
     if (isNaN(importe)) continue;
     var fecha = row[idxFecha];
     if (typeof fecha === 'number') fecha = XLSX.SSF.format('dd/mm/yyyy', fecha);
     else fecha = String(fecha).trim();
     var descripcion = String(row[idxDesc] || '').trim();
-    var saldo = idxSaldo >= 0 ? parseFloat(String(row[idxSaldo] || '').replace(/\./g, '').replace(',', '.')) : null;
+    var saldo = idxSaldo >= 0 ? parseSpanishNumber(row[idxSaldo]) : null;
     var cat = categorize(descripcion, importe);
     movs.push({ fecha: fecha, descripcion: descripcion, importe: importe, saldo: saldo, categoria: cat });
   }
@@ -285,13 +305,13 @@ function parseGenerico(wb) {
   for (var i = headerRow + 1; i < raw.length; i++) {
     var row = raw[i];
     if (!row[idxFecha] && !row[idxImp]) continue;
-    var importe = parseFloat(String(row[idxImp]).replace(/\./g, '').replace(',', '.'));
+    var importe = parseSpanishNumber(row[idxImp]);
     if (isNaN(importe)) continue;
     var fecha = row[idxFecha];
     if (typeof fecha === 'number') fecha = XLSX.SSF.format('dd/mm/yyyy', fecha);
     else fecha = String(fecha).trim();
     var descripcion = String(row[idxDesc] || '').trim();
-    var saldo = idxSaldo >= 0 ? parseFloat(String(row[idxSaldo] || '').replace(/\./g, '').replace(',', '.')) : null;
+    var saldo = idxSaldo >= 0 ? parseSpanishNumber(row[idxSaldo]) : null;
     var cat = categorize(descripcion, importe);
     movs.push({ fecha: fecha, descripcion: descripcion, importe: importe, saldo: saldo, categoria: cat });
   }
