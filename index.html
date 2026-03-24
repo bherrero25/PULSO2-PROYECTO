@@ -157,13 +157,17 @@
         <input type="text" id="filterBuscar" placeholder="Concepto..." oninput="renderTable()" />
       </div>
       <button class="btn btn-secondary" onclick="resetFilters()">Limpiar filtros</button>
-      <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">+ Importar otro fichero</button>
+      <button class="btn btn-secondary" onclick="var fi=document.getElementById('fileInput');fi.value='';fi.click()">+ Importar otro fichero</button>
     </div>
 
     <div class="table-section">
       <div class="table-header">
         <h3>Movimientos</h3>
-        <span id="tableCount">-</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span id="tableCount">-</span>
+          <button class="btn btn-primary" onclick="guardarTodo()" style="font-size:0.8rem;padding:6px 14px">Guardar</button>
+          <button class="btn btn-secondary" onclick="exportCSV()" style="font-size:0.8rem;padding:6px 14px">Exportar CSV</button>
+        </div>
       </div>
       <table>
         <thead>
@@ -466,12 +470,8 @@ function renderTable() {
       html += '<td style="white-space:nowrap;color:#666">' + m.fecha + '</td>';
       var descHtml = '<span class="desc-editable" onclick="editDesc(' + (start+i) + ', this)" title="Clic para editar">' + desc + '</span>';
       html += '<td class="desc-cell">' + descHtml + '</td>';
-      var catCell;
-      if (m.categoria.key === 'otros') {
-        catCell = '<select class="cat-select pending" onchange="onCategoryChange(' + (start+i) + ', this)">' + buildCatOptions('otros') + '</select>';
-      } else {
-        catCell = '<span class="category-badge" style="background:' + m.categoria.color + ';color:' + m.categoria.text + '">' + m.categoria.label + '</span>';
-      }
+      var isPending = m.categoria.key === 'otros';
+      var catCell = '<select class="cat-select' + (isPending ? ' pending' : '') + '" onchange="onCategoryChange(' + (start+i) + ', this)">' + buildCatOptions(m.categoria.key) + '</select>';
       html += '<td>' + catCell + '</td>';
       html += '<td style="text-align:right" class="' + cls + '">' + sign + fmt(m.importe) + '</td>';
       html += '<td style="text-align:right;color:#aaa;font-size:0.82rem">' + saldoCell + '</td>';
@@ -677,13 +677,48 @@ function saveDesc(idx, newVal, el) {
   var mov = allMovimientos[idx];
   if (!mov) return;
   newVal = newVal.trim();
-  if (newVal) mov.descripcion = newVal;
+  if (newVal) {
+    mov.descripcion = newVal;
+    // Save description override to localStorage
+    try {
+      var descOverrides = JSON.parse(localStorage.getItem('pulso2_desc') || '{}');
+      descOverrides[idx + '_' + mov.fecha] = newVal;
+      localStorage.setItem('pulso2_desc', JSON.stringify(descOverrides));
+    } catch(e) {}
+  }
   var desc = mov.descripcion.length > 50 ? mov.descripcion.substring(0,50) + '...' : mov.descripcion;
   el.textContent = desc;
-  if (el.parentElement) el.parentElement.replaceChild(el, el.parentElement.querySelector('input') || el);
-  // Re-render just updates the span text - already done above
-  // Also update filtered list display
   renderTable();
+}
+
+function guardarTodo() {
+  // Save all current categories as learned rules
+  for (var i = 0; i < allMovimientos.length; i++) {
+    var mov = allMovimientos[i];
+    if (mov.categoria.key !== 'otros') {
+      var ruleKey = getRuleKey(mov.descripcion);
+      learnedRules[ruleKey] = mov.categoria;
+    }
+  }
+  saveRules();
+  refreshCategoryFilter();
+  showAlert('Guardado correctamente. Las categorias se aplicaran automaticamente la proxima vez.', 'success');
+}
+
+function exportCSV() {
+  if (!allMovimientos.length) return;
+  var rows = ['Fecha,Descripcion,Categoria,Importe,Saldo'];
+  for (var i = 0; i < allMovimientos.length; i++) {
+    var m = allMovimientos[i];
+    var desc = '"' + m.descripcion.replace(/"/g, '""') + '"';
+    var cat = '"' + m.categoria.label.replace(/"/g, '""') + '"';
+    rows.push([m.fecha, desc, cat, m.importe, m.saldo !== null ? m.saldo : ''].join(','));
+  }
+  var blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'pulso2_movimientos.csv';
+  a.click();
 }
 
 function processFile(file) {
