@@ -405,6 +405,29 @@ function loadData(movs) {
   updateBanner();
 }
 
+function refreshCategoryFilter() {
+  var cats = [];
+  var catKeys = {};
+  for (var i = 0; i < allMovimientos.length; i++) {
+    var key = allMovimientos[i].categoria.key;
+    if (!catKeys[key]) {
+      catKeys[key] = true;
+      cats.push(allMovimientos[i].categoria);
+    }
+  }
+  var sel = document.getElementById('filterCategoria');
+  var currentVal = sel.value;
+  sel.innerHTML = '<option value="">Todas</option>';
+  for (var i = 0; i < cats.length; i++) {
+    var opt = document.createElement('option');
+    opt.value = cats[i].key;
+    opt.textContent = cats[i].label;
+    sel.appendChild(opt);
+  }
+  // Restore selected value if still valid
+  if (currentVal) sel.value = currentVal;
+}
+
 function getFiltered() {
   var tipo = document.getElementById('filterTipo').value;
   var cat = document.getElementById('filterCategoria').value;
@@ -496,10 +519,29 @@ function loadRules() {
     var stored = localStorage.getItem('pulso2_rules');
     if (stored) learnedRules = JSON.parse(stored);
   } catch(e) { learnedRules = {}; }
+  // Load custom categories and add to CATEGORIES if not already there
+  try {
+    var storedCats = localStorage.getItem('pulso2_custom_cats');
+    if (storedCats) {
+      var customCats = JSON.parse(storedCats);
+      for (var i = 0; i < customCats.length; i++) {
+        var exists = false;
+        for (var j = 0; j < CATEGORIES.length; j++) {
+          if (CATEGORIES[j].key === customCats[i].key) { exists = true; break; }
+        }
+        if (!exists) CATEGORIES.push(customCats[i]);
+      }
+    }
+  } catch(e) {}
 }
 
 function saveRules() {
   try { localStorage.setItem('pulso2_rules', JSON.stringify(learnedRules)); } catch(e) {}
+  // Save custom categories separately
+  try {
+    var customCats = CATEGORIES.filter(function(c) { return c.key.indexOf('custom_') === 0; });
+    localStorage.setItem('pulso2_custom_cats', JSON.stringify(customCats));
+  } catch(e) {}
 }
 
 function getRuleKey(descripcion) {
@@ -583,6 +625,7 @@ function onCategoryChange(idx, selectEl) {
   var badge = selectEl.parentElement.querySelector('.category-badge');
   if (badge) { badge.style.background = cat.color; badge.style.color = cat.text; badge.textContent = cat.label; }
 
+  refreshCategoryFilter();
   updateBanner();
   if (count > 1) showAlert('Regla aplicada a ' + count + ' movimientos con el mismo concepto', 'success');
 }
